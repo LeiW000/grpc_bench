@@ -29,6 +29,7 @@ for benchmark in ${BENCHMARKS_TO_BUILD}; do
 			--force-rm \
 			--pull \
 			--compress \
+			--build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy --build-arg no_proxy=$no_proxy \
 			--file "${benchmark}/Dockerfile" \
 			--tag "$GRPC_IMAGE_NAME:${benchmark}-$GRPC_REQUEST_SCENARIO" \
 			. >"${benchmark}.tmp" 2>&1 &&
