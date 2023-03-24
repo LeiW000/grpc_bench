@@ -7,7 +7,6 @@ COPY cpp_grpc_mt_bench /app
 COPY proto /app/proto
 
 RUN git clone --recurse-submodules -b v1.52.1 --depth 1 --shallow-submodules https://github.com/grpc/grpc && \
-    patch -d grpc -p1<server.cc.patch && \
     mkdir grpc/cmake/build && \
     cd grpc/cmake/build && \
     cmake -DBUILD_SHARED_LIBS=ON -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF ../.. && \
