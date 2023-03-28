@@ -1,8 +1,29 @@
+From 440a5c5dfb49bced08f2387b4d1554ea72e945ca Mon Sep 17 00:00:00 2001
+From: Steven Wang <steven.l.wang@linux.intel.com>
+Date: Tue, 28 Mar 2023 06:33:25 +0000
+Subject: [PATCH] The changes to MatchOrQueue() to improve multi-threads
+ performace.
+
+If multiple threads call LockedMultiProducerSingleConsumerQueue::TryPop()
+at the same time, much of cpu time will be consumed Mutex::TryLock().
+
+For the details of the issue, please see #32700.
+
+To reduce calls of LockedMultiProducerSingleConsumerQueue::TryPop(),
+don't try all the queue for a request, but only one, which belongs to the
+current thread. If fails, goes to the slow path.
+
+With the change, I see ~23% performance gain with 40 threads, and ~73%
+performance gain with 150 threads.
+---
+ src/core/lib/surface/server.cc | 18 ++++++++----------
+ 1 file changed, 8 insertions(+), 10 deletions(-)
+
 diff --git a/src/core/lib/surface/server.cc b/src/core/lib/surface/server.cc
-index 985342265f..b0cd342aa3 100644
+index 985342265f..beda1331b4 100644
 --- a/src/core/lib/surface/server.cc
 +++ b/src/core/lib/surface/server.cc
-@@ -268,22 +268,33 @@ class Server::RealRequestMatcher : public RequestMatcherInterface {
+@@ -268,22 +268,20 @@ class Server::RealRequestMatcher : public RequestMatcherInterface {
  
    void MatchOrQueue(size_t start_request_queue_index,
                      CallData* calld) override {
@@ -15,27 +36,14 @@ index 985342265f..b0cd342aa3 100644
 -        calld->Publish(cq_idx, rc);
 -        return;
 -      }
-+
-+
-+    RequestedCall* rc =
-+      reinterpret_cast<RequestedCall*>(requests_per_cq_[start_request_queue_index].TryPop());
++    RequestedCall* rc = reinterpret_cast<RequestedCall*>(
++        requests_per_cq_[start_request_queue_index].TryPop());
 +    if (rc != nullptr) {
 +      calld->SetState(CallData::CallState::ACTIVATED);
 +      calld->Publish(start_request_queue_index, rc);
 +      return;
      }
-+    
-+    // for (size_t i = 0; i < requests_per_cq_.size(); i++) {
-+    //   size_t cq_idx = (start_request_queue_index + i) % requests_per_cq_.size();
-+    //   RequestedCall* rc =
-+    //       reinterpret_cast<RequestedCall*>(requests_per_cq_[cq_idx].TryPop());
-+    //   if (rc != nullptr) {
-+    //     calld->SetState(CallData::CallState::ACTIVATED);
-+    //     calld->Publish(cq_idx, rc);
-+    //     return;
-+    //   }
-+    // }
-+    
++
      // No cq to take the request found; queue it on the slow list.
      // We need to ensure that all the queues are empty.  We do this under
      // the server mu_call_ lock to ensure that if something is added to
@@ -46,3 +54,6 @@ index 985342265f..b0cd342aa3 100644
      size_t cq_idx = 0;
      size_t loop_count;
      {
+-- 
+2.25.1
+
