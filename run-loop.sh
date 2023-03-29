@@ -1,8 +1,8 @@
 #!/usr/bin/bash
 
 #Maybe, need to change the setting.
-export GRPC_IMAGE_NAME=grpc_bench_base
-export GRPC_REQUEST_SCENARIO=representative1
+export GRPC_IMAGE_NAME=grpc_bench_opt
+export GRPC_REQUEST_SCENARIO=complex_proto
 #export GRPC_SERVER_CPUS=10
 
 export GRPC_BENCHMARK_DURATION=120s
